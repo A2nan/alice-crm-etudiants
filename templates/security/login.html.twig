@@ -13,8 +13,12 @@
 
         <form method="post" class="row form mt-5 mt-lg-0">
 
+                {# pas de |raw ici : messageData peut contenir la saisie de l'utilisateur #}
                 {% if error %}
-                    <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security')|raw }}</div>
+                    <div class="alert alert-danger">
+                        {{ error.messageKey|trans(error.messageData, 'security') }}
+                        <a href="mailto:alice.webdeveloppement@gmail.com?subject=Probl%C3%A8me%20de%20connexion%20%7C%20Alice%20CRM" class="hover-link">Signaler un problème.</a>
+                    </div>
                 {% endif %}
 
 

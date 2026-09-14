@@ -137,7 +137,8 @@
             </div>
         </div>
         <div class="d-flex flex-column justify-content-center align-items-center mb-5 px-0 mt-2">
-            <div id="serp" class="btn btn-alice-serp col-10 col-md-6 col-lg-4">Afficher les résultats</div>
+            <div id="serp" class="btn btn-alice-serp col-10 col-md-6 col-lg-4"
+                 data-serp-save-url="{{ path('app_serp_result_new') }}">Afficher les résultats</div>
             <div class="col-10 col-md-6 col-lg-4 mt-2">
                 {{ form(serpResultForm) }}
             </div>

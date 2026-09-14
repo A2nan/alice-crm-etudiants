@@ -8,6 +8,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Validator\Constraints\Regex;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\NotCompromisedPassword;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\EmailType;
@@ -48,21 +49,25 @@ class NewUserType extends AbstractType
                     'placeholder' => 'Entrez un mot de passse provisoire'
                 ],
                 'constraints' => [
-                    // longueure min 8 max 20
+                    // au moins 12 caracteres, pas de plafond bas (OWASP ASVS 2.1.1/2.1.2)
                     new Length([
-                        'min' => 8, 
-                        'max' => 20,
-                        'minMessage' => 'Le mot depasse doit contenir au moins 8 caractères',
-                        'maxMessage' => 'Le mot depasse doit contenir moins de 20 caractères' 
+                        'min' => 12,
+                        'max' => 4096,
+                        'minMessage' => 'Le mot de passe doit contenir au moins 12 caractères',
+                        'maxMessage' => 'Le mot de passe est trop long' 
                     ]),
                     // invalide si null
                     new NotBlank([
                         'message' => 'Veuillez renseigner un mot de passe !'
                     ]),
-                    // Oblige à entrer un MDP avec 8 à 20 char + 1 maj + 1 min + chiffre + caractere spé 
+                    // 1 maj + 1 min + 1 chiffre + 1 caractere special, 12 caracteres minimum 
                     new Regex([
-                        'pattern' => '/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,20}$/',
-                        'message' => 'Votre mot de passe doit contenir 1 majuscule, 1 minuscule, 1 caractère spécial, 1 chiffre et doit être composé de 8 à 20 caractères'
+                        'pattern' => '/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{12,}$/',
+                        'message' => 'Votre mot de passe doit contenir 1 majuscule, 1 minuscule, 1 caractère spécial, 1 chiffre et doit contenir au moins 12 caractères'
+                    ]),
+                    // checked against the haveibeenpwned list (k-anonymity: the password never leaves the server in clear)
+                    new NotCompromisedPassword([
+                        'message' => 'Ce mot de passe est apparu dans une fuite de données. Merci d’en choisir un autre.'
                     ]),
                 ],
                 // TODO : revoir cette partie sur le MDP provisoire .............

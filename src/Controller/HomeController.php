@@ -58,12 +58,9 @@ class HomeController extends AbstractController
                 10
             );
 
-            if ($this->isGranted('ROLE_USER')) {
-                // return the contacts of the connected user if not ADMIN
-                $contacts = $user->getContacts();
-            }
-    
-            
+            // no isGranted('ROLE_USER') test here : User::getRoles() grants that role to
+            // everyone, so the branch was always taken and left $contacts undefined otherwise
+            $contacts = $user->getContacts();
 
         } else {
 

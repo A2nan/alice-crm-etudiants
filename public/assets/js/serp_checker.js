@@ -40,8 +40,8 @@ function checkRank(element) {
         if (rank > 0) {
 
           rankElement.innerHTML = "Le site est au rang : " + rank;
-          saveRank(keyword, rank);
-          // rankElement.innerHTML = element.dataset.keyword;
+          // the API expects the SerpInfo identifier, not the keyword text
+          saveRank(element.dataset.keyword, rank);
 
         } else {
           rankElement.innerHTML = "Le site n'est pas dans les 10 premiers résultats : position " + rank;
@@ -97,20 +97,30 @@ $closeSerpFormButton.addEventListener("click", function(){
   $serpInfoForm.style.display = "none";
 })
 
-function saveRank(keyword, rank) {
+function saveRank(serpInfoId, rank) {
+  // the URL is carried by the template, so the route can change without touching this file
+  let saveUrl = searchButton.dataset.serpSaveUrl;
+
+  if (!saveUrl) {
+    console.error("URL d'enregistrement absente (data-serp-save-url)");
+    return;
+  }
+
   let xhr = new XMLHttpRequest();
-  console.log(xhr);
-  xhr.open('POST', '', true);
+  xhr.open('POST', saveUrl, true);
   xhr.setRequestHeader('Content-Type', 'application/json');
   xhr.onload = function() {
-    if (xhr.status === 200) {
-      console.log('Rank saved successfully!');
+    // the endpoint answers 201 Created
+    if (xhr.status === 201) {
+      console.log('Rang enregistré pour le mot clé ' + serpInfoId);
     } else {
-      console.log('Failed to save rank');
+      console.error('Échec de l\'enregistrement du rang (HTTP ' + xhr.status + ') : ' + xhr.responseText);
     }
   };
-  let now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  let data = { serp_result: { googleRank: rank, serpInfo: keyword, date: now } };
-  console.log(data);
-  xhr.send(JSON.stringify(data));
+  xhr.onerror = function() {
+    console.error("Échec de l'appel d'enregistrement du rang");
+  };
+
+  // the date is set server side, it is not the browser's business
+  xhr.send(JSON.stringify({ serpInfo: Number(serpInfoId), googleRank: rank }));
 }

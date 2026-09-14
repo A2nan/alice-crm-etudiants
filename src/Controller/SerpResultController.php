@@ -4,8 +4,10 @@ namespace App\Controller;
 
 use App\Entity\SerpResult;
 use App\Form\SerpResultType;
+use App\Repository\SerpInfoRepository;
 use App\Repository\SerpResultRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -21,27 +23,56 @@ class SerpResultController extends AbstractController
         ]);
     }
 
+    /**
+     * JSON endpoint used to store a rank measured for a keyword.
+     *
+     * Expected body : {"serpInfo": <id of the SerpInfo>, "googleRank": <int >= 1>}
+     */
     #[Route('/new', name: 'app_serp_result_new', methods: ['POST'])]
-    public function save(Request $request, SerpResultRepository $serpResultRepository): Response
-    {
-        
-        $serpResult = new SerpResult();
-        $form = $this->createForm(SerpResultType::class, $serpResult);
-        $form->handleRequest($request);
-    
-        // Add code to handle the JSON data sent by the JavaScript function
+    public function save(
+        Request $request,
+        SerpInfoRepository $serpInfoRepository,
+        SerpResultRepository $serpResultRepository
+    ): JsonResponse {
         $data = json_decode($request->getContent(), true);
-        
-        if (isset($data['keyword']) && isset($data['rank'])) {
-            $serpResult->setSerpInfo($data['keyword']);
-            $serpResult->setGoogleRank($data['rank']);
-            $serpResultRepository->save($serpResult, true);
+
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Corps de requête JSON invalide.'], Response::HTTP_BAD_REQUEST);
         }
-    
-        return $this->render('serp_result/new.html.twig', [
-            'serp_result' => $serpResult,
-            'form' => $form,
-        ]);
+
+        // filter_var() rejects "abc" and "1.5" where a plain (int) cast would silently return 0
+        $serpInfoId = filter_var($data['serpInfo'] ?? null, FILTER_VALIDATE_INT);
+        $googleRank = filter_var($data['googleRank'] ?? null, FILTER_VALIDATE_INT);
+
+        if (false === $serpInfoId || false === $googleRank || $googleRank < 1) {
+            return $this->json(
+                ['error' => 'Les champs "serpInfo" (identifiant) et "googleRank" (entier >= 1) sont requis.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        // the relation expects a SerpInfo entity, not the identifier itself
+        $serpInfo = $serpInfoRepository->find($serpInfoId);
+
+        if (!$serpInfo) {
+            return $this->json(['error' => 'Mot clé introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $serpResult = new SerpResult();
+        $serpResult->setSerpInfo($serpInfo);
+        $serpResult->setGoogleRank($googleRank);
+        // date is NOT NULL in database and the prePersist callback of the entity never fires
+        // (the class carries no #[ORM\HasLifecycleCallbacks]), so it is set here
+        $serpResult->setDate(new \DateTime());
+
+        $serpResultRepository->save($serpResult, true);
+
+        return $this->json([
+            'id' => $serpResult->getId(),
+            'serpInfo' => $serpInfo->getId(),
+            'googleRank' => $serpResult->getGoogleRank(),
+            'date' => $serpResult->getDate()->format('Y-m-d'),
+        ], Response::HTTP_CREATED);
     }
     
 

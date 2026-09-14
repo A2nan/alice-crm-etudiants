@@ -169,8 +169,11 @@ class DocumentController extends AbstractController
             throw $this->createNotFoundException('Le fichier est introuvable.');
         }
 
-        // the name sent to the browser is the business name, not the name on disk
-        $downloadName = $document->getName().'.'.pathinfo($document->getFileName(), PATHINFO_EXTENSION);
+        // The name sent to the browser is the business name, not the name on disk.
+        // Slashes must go : Symfony refuses them in a Content-Disposition header
+        // and would throw, turning a legitimate download into a 500.
+        $downloadName = str_replace(['/', '\\'], '-', $document->getName())
+            .'.'.pathinfo($document->getFileName(), PATHINFO_EXTENSION);
 
         return $this->file($path, $downloadName, $disposition);
     }

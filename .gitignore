@@ -29,3 +29,5 @@ uploads
 /MAQUETTAGE
 todo.txt
 /.env.test
+### Audit interne - ne jamais versionner ###
+AUDIT.md

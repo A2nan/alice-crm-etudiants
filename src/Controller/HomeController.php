@@ -8,6 +8,7 @@ use Cocur\Slugify\Slugify;
 use App\Form\EditContactType;
 use App\Repository\ContactRepository;
 use App\Repository\DocumentRepository;
+use App\Security\Voter\ContactVoter;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -140,17 +141,10 @@ class HomeController extends AbstractController
     }
 
     #[Route('/contacts/{id}/{slug}/modifier-un-contact', name: 'app_contacts_user_edit')]
-    public function editUserContact(Request $request, $id, ContactRepository $contactRepository): Response
+    public function editUserContact(Request $request, Contact $contact): Response
     {
-        $contact = $contactRepository->findOneById($id);
-
-        if (!$contact) {
-            $this->addFlash(
-                'error',
-                'Le contact n\'existe pas.'
-            );
-            return $this->redirectToRoute('app_home'); 
-        }
+        // a user only edits his own contacts, an ADMIN edits them all
+        $this->denyAccessUnlessGranted(ContactVoter::EDIT, $contact);
 
         $form = $this->createForm(EditContactType::class, $contact);
 

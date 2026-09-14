@@ -42,19 +42,12 @@ class ContactController extends AbstractController
 
 
     #[Route('/{id}/{slug}', name: 'app_contact')]
-    public function showContact($id) 
+    public function showContact(Contact $contact): Response
     {
-
-        $contact = $this->contactRepository->findOneById($id);
-        
-        // récup user associé
+        // 404 automatique si l'identifiant n'existe pas : le test if(!$contact)
+        // etait place apres $contact->getUser(), donc inatteignable
         $user = $contact->getUser();
         $customer = $user->getCustomer();
-        
-
-        if(!$contact) { // si tu ne trouve pas de ID, redirect to app_contacts (liste des contacts)
-            return $this->redirectToRoute('app_contacts');
-        }
 
         return $this->render('admin/contact_show.html.twig', [
             'contact' => $contact,
@@ -129,19 +122,11 @@ class ContactController extends AbstractController
     // Edit 
 
     #[Route('/modifier-un-contact/{id}/{slug}', name: 'app_contact_edit')]
-    public function editContact(Request $request, $id, $slug): Response
+    public function editContact(Request $request, Contact $contact): Response
     {
-        $contact = $this->contactRepository->findOneById($id);
+        // 404 automatique si l'identifiant n'existe pas
         $user = $contact->getUser();
         $customer = $user->getCustomer();
-
-        if (!$contact) {
-            $this->addFlash(
-                'error',
-                'Le contact n\'existe pas.'
-            );
-            return $this->redirectToRoute('app_user_show', array('id' => $id, 'slug' => $slug)); 
-        }
 
         $form = $this->createForm(EditContactType::class, $contact);
 
@@ -154,7 +139,7 @@ class ContactController extends AbstractController
                 'success',
                 'La modification du contact est bien enregistrée.'
             );
-            return $this->redirectToRoute('app_contact', array('id' => $id, 'slug' => $slug));
+            return $this->redirectToRoute('app_contact', ['id' => $contact->getId(), 'slug' => $contact->getSlug()]);
         }
 
         return $this->render('admin/contact_edit.html.twig', [
@@ -165,55 +150,43 @@ class ContactController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/{slug}/supprimer', name: 'app_contact_delete')]
-    public function deleteContact(Request $request, $id): Response
+    // POST only : a destructive action must never be reachable by following a link.
+    // The CSRF token travels in the body, not in the query string where it would
+    // end up in the server logs, the browser history and the Referer header.
+    #[Route('/{id}/{slug}/supprimer', name: 'app_contact_delete', methods: ['POST'])]
+    public function deleteContact(Request $request, Contact $contact): Response
     {
-        $contact = $this->contactRepository->findOneById($id);
         $user = $contact->getUser();
         $userId = $user->getId();
         $slug = $user->getSlug();
-        $csrf_token = $request->query->get('csrf_token', '');
 
-        
-        if (!$this->isCsrfTokenValid('delete_contact' . $contact->getId(), $csrf_token)) {
+        if (!$this->isCsrfTokenValid('delete_contact' . $contact->getId(), $request->request->get('_token'))) {
             $this->addFlash(
                 'error',
                 'Vous ne pouvez pas supprimer cet élément.'
             );
 
-            // without this return the method falls through and returns null,
-            // which breaks the ": Response" signature
             return $this->redirectToRoute('app_user_show', ['id' => $userId, 'slug' => $slug]);
-        } else {
-            // si le contact est lié à un client + redirect sur la page client 
-            if($user->getCustomer()){
-                $customer = $user->getCustomer();
-                $customerId = $customer->getId();
-                $customerSlug = $customer->getSlug();
-
-                $this->contactRepository->remove($contact, true);
-
-                $this->addFlash(
-                    'success',
-                    'Le contact à été supprimé.'
-                );
-                return $this->redirectToRoute('app_customer', ['id' => $customerId, 'slug' => $customerSlug]);
-                
-                
-            } else {
-                
-                // si le contact est lié à un utilisateur autre que client 
-
-                $this->contactRepository->remove($contact, true);
-                
-                $this->addFlash(
-                    'success',
-                    'Le contact à été supprimé.'
-                );
-                
-                return $this->redirectToRoute('app_user_show', ['id' => $userId, 'slug' => $slug]);
-            }
         }
+
+        $customer = $user->getCustomer();
+
+        $this->contactRepository->remove($contact, true);
+
+        $this->addFlash(
+            'success',
+            'Le contact a été supprimé.'
+        );
+
+        // back to the customer page when the contact belongs to one, to the user page otherwise
+        if ($customer) {
+            return $this->redirectToRoute('app_customer', [
+                'id' => $customer->getId(),
+                'slug' => $customer->getSlug(),
+            ]);
+        }
+
+        return $this->redirectToRoute('app_user_show', ['id' => $userId, 'slug' => $slug]);
     }
             
 }

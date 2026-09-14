@@ -16,6 +16,9 @@ security:
         main:
             lazy: false
             provider: app_user_provider
+            # vérifie l'état du compte APRÈS validation du mot de passe,
+            # pour ne pas divulguer quelles adresses sont enregistrées
+            user_checker: App\Security\UserChecker
             entry_point: App\Security\LoginFormAuthenticator
             form_login:
                 # "app_login" is the name of the route created previously

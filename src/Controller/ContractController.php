@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Contract;
+use App\Entity\Customer;
 use App\Entity\SerpInfo;
 use App\Entity\SerpResult;
 use App\Form\ContractType;
@@ -48,9 +49,9 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_contract_show')]
-    public function showContract($id, Request $request, ManagerRegistry $doctrine): Response
+    public function showContract(Contract $contract, Request $request, ManagerRegistry $doctrine): Response
     {
-        $contract = $this->contractRepository->findOneById($id);
+        // 404 automatique si l'identifiant n'existe pas (aucun test n'existait ici)
         $serpInfos = $contract->getSerpInfos();
         $googleApiKey = $this->getParameter('app.googlesearch.api_key');
         $googleCustomApiKey = $this->getParameter('app.googlecustomsearch.api_key');
@@ -71,7 +72,7 @@ class ContractController extends AbstractController
 
             $this->addFlash('success', 'Mot clé enregistré avec succès');
 
-            return $this->redirectToRoute('app_contract_show', ['id' => $id]);
+            return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
 
         $serpResultForm = $this->createForm(SerpResultType::class);
@@ -120,7 +121,7 @@ class ContractController extends AbstractController
                 $this->addFlash('error', 'Le site n\'a pas été trouvé dans les résultats de recherche Google pour aucun des mots-clés.');
             }
     
-            return $this->redirectToRoute('app_contract_show', ['id' => $id]);
+            return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
         
         return $this->render('admin_main/contract_show.html.twig', [
@@ -134,9 +135,9 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/{slug}/creer-un-contrat', name: 'app_contract_add')]
-    public function createContract(Request $request, $id): Response
+    public function createContract(Request $request, Customer $customer): Response
     {
-        $customer = $this->customerRepository->findOneById($id);
+        // meme defaut que les precedents : aucun test de nullite avant getSlug()
         $slug = $customer->getSlug();
 
         $contract = new Contract;
@@ -160,7 +161,7 @@ class ContractController extends AbstractController
                     'La création du contrat est bien enregistrée.'
                 );
 
-                return $this->redirectToRoute('app_customer', ['id' => $id, 'slug' => $slug]);
+                return $this->redirectToRoute('app_customer', ['id' => $customer->getId(), 'slug' => $slug]);
 
             }
         }
@@ -174,16 +175,13 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/modifier-un-contrat', name: 'app_contract_edit')]
-    public function editContract(Request $request, $id): Response
+    public function editContract(Request $request, Contract $contract): Response
     {
-        $contract = $this->contractRepository->findOneById($id);
+        // 404 automatique si l'identifiant n'existe pas : le test if(!$contract)
+        // etait place apres $contract->getCustomer(), donc inatteignable
         $customer = $contract->getCustomer();
         $user = $customer->getUser();
         $userId = $user->getId();
-
-        if (!$contract) {
-            return $this->redirectToRoute('app_customer_list');
-        }
 
         $form = $this->createForm(EditContractType::class, $contract);
 
@@ -192,7 +190,7 @@ class ContractController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->contractRepository->save($contract, true);
-            return $this->redirectToRoute('app_contract_show', array('id' => $id));
+            return $this->redirectToRoute('app_contract_show', ['id' => $contract->getId()]);
         }
 
         return $this->render('admin_main/contract_edit.html.twig', [
@@ -204,16 +202,15 @@ class ContractController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/supprimer', name: 'app_contract_remove')]
+    // POST only + jeton CSRF dans le corps, pas dans l'URL
+    #[Route('/{id}/supprimer', name: 'app_contract_remove', methods: ['POST'])]
     public function removeContract(Contract $contract, Request $request): Response
     {
 
         $customer = $contract->getCustomer();
         $customerId = $customer->getId();
         $customerSlug = $customer->getSlug();
-        $csrf_token = $request->query->get('csrf_token', '');
-
-        if (!$this->isCsrfTokenValid('delete_contract' . $contract->getId(), $csrf_token)) {
+        if (!$this->isCsrfTokenValid('delete_contract' . $contract->getId(), $request->request->get('_token'))) {
 
             $this->addFlash(
                 'error',
@@ -233,7 +230,8 @@ class ContractController extends AbstractController
 
     }
 
-    #[Route('/{id}/supprimer-serp-info/{serpInfoId}', name: 'app_serp_info_remove')]
+    // POST only + jeton CSRF dans le corps, pas dans l'URL
+    #[Route('/{id}/supprimer-serp-info/{serpInfoId}', name: 'app_serp_info_remove', methods: ['POST'])]
     public function removeSerpInfo(
         // {id} is the contract, the keyword to delete is carried by {serpInfoId}
         #[MapEntity(id: 'serpInfoId')] SerpInfo $serpInfo,
@@ -244,9 +242,7 @@ class ContractController extends AbstractController
 
         $contract = $serpInfo->getContract();
         $contractId = $contract->getId();
-        $csrf_token = $request->query->get('csrf_token', '');
-
-        if (!$this->isCsrfTokenValid('delete_serp_info' . $serpInfo->getId(), $csrf_token)) {
+        if (!$this->isCsrfTokenValid('delete_serp_info' . $serpInfo->getId(), $request->request->get('_token'))) {
 
             $this->addFlash(
                 'error',

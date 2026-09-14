@@ -28,7 +28,7 @@ uploads
 /public/bundles/fosckeditor/
 /MAQUETTAGE
 todo.txt
-/.env.test
+# /.env.test  -> doit etre versionne (voir le fichier lui-meme)
 ### Audit interne - ne jamais versionner ###
 AUDIT.md
 

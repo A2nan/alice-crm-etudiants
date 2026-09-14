@@ -17,11 +17,11 @@ use App\Repository\ContractRepository;
 use App\Repository\CustomerRepository;
 use App\Repository\TariffZoneRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
 use Doctrine\Persistence\ManagerRegistry as PersistenceManagerRegistry;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -62,7 +62,6 @@ class AdminMainController extends AbstractController
     }
 
     #[Route('/utilisateur/{id}/{slug}', name: 'app_user_show')]
-    #[ParamConverter('user', options: ['mapping' => ['id' => 'id', 'slug' => 'slug']])]
     public function showUser(User $id, string $slug): Response
     {
         $user = $this->userRepository->findOneById($id);
@@ -145,8 +144,7 @@ class AdminMainController extends AbstractController
     }
 
     #[Route('/utilisateur/{id}/{slug}/modifier', name: 'app_user_edit')]
-    #[ParamConverter('user', options: ['mapping' => ['id' => 'id', 'slug' => 'slug']])]
-    public function editUser(Request $request, $id, $slug, PersistenceManagerRegistry $doctrine, User $user): Response
+    public function editUser(Request $request, $id, $slug, PersistenceManagerRegistry $doctrine, #[MapEntity(mapping: ['id' => 'id', 'slug' => 'slug'])] User $user): Response
     {
         if (!$user) {
             $this->addFlash(
@@ -205,7 +203,6 @@ class AdminMainController extends AbstractController
     }
 
     #[Route('/client/{id}/{slug}', name: 'app_customer')]
-    #[ParamConverter('customer', options: ['mapping' => ['id' => 'id', 'slug' => 'slug']])]
     public function showCustomer(Customer $id, String $slug, Request $request): Response
     {
         // recover customer object
@@ -261,8 +258,7 @@ class AdminMainController extends AbstractController
     }
 
     #[Route('/client/creer-un-client/{id}/{slug}', name: 'app_customer_add')]
-    #[ParamConverter('user', options: ['mapping' => ['id' => 'id']])]
-    public function createCustomer(Request $request, EntityManagerInterface $entityManager, PersistenceManagerRegistry $doctrine, User $user): Response
+    public function createCustomer(Request $request, EntityManagerInterface $entityManager, PersistenceManagerRegistry $doctrine, #[MapEntity(id: 'id')] User $user): Response
     {
         $user = $this->userRepository->findOneById($user);
         $tariffZone = $this->tariffZoneRepository->findAll();
@@ -327,8 +323,6 @@ class AdminMainController extends AbstractController
     
 
     #[Route('/client/{id}/{slug}/modifier-un-client', name: 'app_customer_edit')]
-    #[ParamConverter('customer', options: ['mapping' => ['id' => 'id']])]
-    #[ParamConverter('customer', options: ['mapping' => ['slug' => 'slug']])]
     public function editCustomer(Request $request, $id, $slug): Response
     {
 
@@ -376,9 +370,7 @@ class AdminMainController extends AbstractController
     }
     
     #[Route('/contenu-dynamique/modifier/{id}/{slug}/{name}/', name: 'dynamic_content_edit', requirements: ["name" => "[a-z0-9_-]{2,50}"])]
-    #[ParamConverter('customer', options: ['mapping' => ['slug' => 'slug']])]
-    #[ParamConverter('customer', options: ['mapping' => ['id' => 'id']])]
-    public function dynamicContentEdit($name, PersistenceManagerRegistry $doctrine, Request $request, Customer $customer): Response
+    public function dynamicContentEdit($name, PersistenceManagerRegistry $doctrine, Request $request, #[MapEntity(id: 'id')] Customer $customer): Response
     {
         // We will search by name (which serves as a key) the corresponding dynamic content
         $dynamicContentRepo = $doctrine->getRepository(DynamicContent::class);

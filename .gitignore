@@ -31,3 +31,8 @@ todo.txt
 /.env.test
 ### Audit interne - ne jamais versionner ###
 AUDIT.md
+
+### Aucune dependance npm dans ce projet (Symfony pur) ###
+/node_modules/
+/package.json
+/package-lock.json

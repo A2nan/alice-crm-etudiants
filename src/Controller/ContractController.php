@@ -13,12 +13,12 @@ use App\Repository\ContractRepository;
 use App\Repository\CustomerRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
 use Doctrine\Persistence\ManagerRegistry as PersistenceManagerRegistry;
 
 
@@ -234,9 +234,13 @@ class ContractController extends AbstractController
     }
 
     #[Route('/{id}/supprimer-serp-info/{serpInfoId}', name: 'app_serp_info_remove')]
-    #[ParamConverter('serpInfo', options: ['id' => 'serpInfoId'])]
-    public function removeSerpInfo(SerpInfo $serpInfo, Request $request, EntityManagerInterface $entityManager, PersistenceManagerRegistry $doctrine): Response
-    {
+    public function removeSerpInfo(
+        // {id} is the contract, the keyword to delete is carried by {serpInfoId}
+        #[MapEntity(id: 'serpInfoId')] SerpInfo $serpInfo,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        PersistenceManagerRegistry $doctrine
+    ): Response {
 
         $contract = $serpInfo->getContract();
         $contractId = $contract->getId();

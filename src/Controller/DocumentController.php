@@ -6,12 +6,14 @@ use App\Entity\User;
 use App\Entity\Document;
 use App\Form\DocumentType;
 use App\Repository\DocumentRepository;
+use App\Security\Voter\DocumentVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Knp\Component\Pager\PaginatorInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -104,7 +106,8 @@ class DocumentController extends AbstractController
                 $safeFilename = $slugger->slug($originalFilename);
                 $safeFilename = substr($safeFilename, 0, 20); // extracts the first 20 characters
                 $currentDate = date('Ymd'); // add date
-                $newFilename = $currentDate.'-'.$safeFilename.'-'.uniqid().'.'.$file->guessExtension(); // gess extention and add to the URL
+                // random_bytes() is cryptographically secure, unlike uniqid() which is derived from the clock
+                $newFilename = $currentDate.'-'.$safeFilename.'-'.bin2hex(random_bytes(16)).'.'.$file->guessExtension();
                 try {
                     // Move the file to the directory where brochures are stored
                     $file->move(
@@ -134,21 +137,39 @@ class DocumentController extends AbstractController
     #[Route('/{id}', name: 'app_document_show', methods: ['GET'])]
     public function show(Document $document, AuthorizationCheckerInterface $authChecker): Response
     {
-        // Create a status isAuthorized status to filter users who are authorized to view the document
-        
+        // ADMIN sees everything, a user only sees the documents linked to him
+        $this->denyAccessUnlessGranted(DocumentVoter::VIEW, $document);
+
+        // isAuthorized still drives the display of the edit/delete actions in the template
         $isAuthorized = $authChecker->isGranted('ROLE_ADMIN');
-        $authorizedUsers = $document->getUser()->toArray();
-        $user = $this->getUser();
-    
-        if (!$isAuthorized && !in_array($user, $authorizedUsers)) {
-            throw $this->createAccessDeniedException();
-        }
-    
+
         return $this->render('document/show.html.twig', [
             'document' => $document,
             'isAuthorized' => $isAuthorized,
-            'authorizedUsers' => $authorizedUsers,
+            'authorizedUsers' => $document->getUser()->toArray(),
         ]);
+    }
+
+    /**
+     * Serves the uploaded file. Stored outside the web root, so this is the only
+     * way to reach it : the access rights are checked on every request.
+     */
+    #[Route('/{id}/telecharger', name: 'app_document_download', methods: ['GET'], defaults: ['disposition' => 'attachment'])]
+    #[Route('/{id}/apercu', name: 'app_document_preview', methods: ['GET'], defaults: ['disposition' => 'inline'])]
+    public function download(Document $document, string $disposition): BinaryFileResponse
+    {
+        $this->denyAccessUnlessGranted(DocumentVoter::VIEW, $document);
+
+        $path = $this->getParameter('documents_directory').'/'.$document->getFileName();
+
+        if (!$document->getFileName() || !is_file($path)) {
+            throw $this->createNotFoundException('Le fichier est introuvable.');
+        }
+
+        // the name sent to the browser is the business name, not the name on disk
+        $downloadName = $document->getName().'.'.pathinfo($document->getFileName(), PATHINFO_EXTENSION);
+
+        return $this->file($path, $downloadName, $disposition);
     }
 
     #[Route('/{id}/modifier', name: 'app_document_edit', methods: ['GET', 'POST'])]
